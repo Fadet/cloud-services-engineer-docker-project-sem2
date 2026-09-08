@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,8 +27,21 @@ func main() {
 	}
 }
 
+func listenAddr() string {
+	port := os.Getenv("BACKEND_PORT")
+	if port == "" {
+		port = "8081"
+	}
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port
+	}
+	return port
+}
+
 func run() error {
-	lis, err := net.Listen("tcp", ":8081")
+	addr := listenAddr()
+
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
@@ -54,7 +68,7 @@ func run() error {
 
 	errChan := make(chan error, 1)
 	go func() {
-		logger.Log.Info("starting HTTP server", zap.String("address", ":8081"))
+		logger.Log.Info("starting HTTP server", zap.String("address", addr))
 		if err := srv.Serve(lis); err != nil {
 			errChan <- fmt.Errorf("error serving HTTP: %w", err)
 		}

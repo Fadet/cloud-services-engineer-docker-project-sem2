@@ -1,0 +1,24 @@
+server {
+    listen ${FRONTEND_PORT};
+    server_name _;
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+    gzip_min_length 1024;
+
+    # liveness самого nginx
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+
+    location /momo-store/ {
+        root /usr/share/nginx/html;
+        try_files $uri $uri/ /momo-store/index.html;
+    }
+
+    location = / {
+        return 302 /momo-store/;
+    }
+}

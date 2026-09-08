@@ -3,3 +3,12 @@ Dockerfile
 *_test.go
 .git
 .gitignore
+.env
+.env.*
+.npmrc
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx

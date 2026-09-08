@@ -6,38 +6,55 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strconv"
+	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"gitlab.praktikum-services.ru/Stasyan/momo-store/cmd/api/dependencies"
+	"gitlab.praktikum-services.ru/Stasyan/momo-store/internal/orderid"
 )
 
+var orderIDFormat = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
 func TestFakeAppIntegrational(t *testing.T) {
-	store, err := dependencies.NewFakeDumplingsStore()
+	idGen, err := orderid.New([]byte("test-secret"))
+	require.NoError(t, err)
+	store, err := dependencies.NewFakeDumplingsStore(idGen)
 	assert.NoError(t, err)
 	app, err := NewInstance(store)
 	assert.NoError(t, err)
 
+	// Идентификатор заказа непрозрачен, поэтому конкретное значение не проверяем:
+	// проверяем формат и то, что значения не повторяются.
 	t.Run("create_order", func(t *testing.T) {
+		seen := make(map[string]struct{}, 10)
+
 		for i := 1; i <= 10; i++ {
-			t.Run("id"+strconv.Itoa(i), func(t *testing.T) {
-				r := httptest.NewRequest("POST", "/orders", nil)
-				w := httptest.NewRecorder()
-				app.CreateOrderController(w, r)
+			r := httptest.NewRequest("POST", "/orders", nil)
+			w := httptest.NewRecorder()
+			app.CreateOrderController(w, r)
 
-				assert.Equal(t, http.StatusOK, w.Code)
-				assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
-				fmt.Fprintln(os.Stdout, "_____")
-				fmt.Fprintln(os.Stdout, w.Body.String())
-				fmt.Fprintln(os.Stdout, "_____")
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
-				expectedJSON, err := json.Marshal(map[string]interface{}{"id": i})
-				assert.NoError(t, err)
-				assert.JSONEq(t, string(expectedJSON), w.Body.String())
-			})
+			var got struct {
+				ID string `json:"id"`
+			}
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &got))
+
+			fmt.Fprintln(os.Stdout, "_____")
+			fmt.Fprintln(os.Stdout, w.Body.String())
+			fmt.Fprintln(os.Stdout, "_____")
+
+			assert.Regexp(t, orderIDFormat, got.ID)
+			_, duplicate := seen[got.ID]
+			assert.False(t, duplicate, "повторный id заказа: %s", got.ID)
+			seen[got.ID] = struct{}{}
 		}
+
+		assert.Len(t, seen, 10)
 	})
 
 	t.Run("list_dumplings", func(t *testing.T) {

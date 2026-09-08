@@ -2,24 +2,23 @@ package fake
 
 import (
 	"context"
-	"math/rand"
-	"sync/atomic"
-	"time"
 
 	"gitlab.praktikum-services.ru/Stasyan/momo-store/internal/store/dumplings"
 )
 
+// IDGenerator выдаёт идентификаторы заказов.
+type IDGenerator interface {
+	Next() string
+}
+
 // Store is a fake in-memory implementation of dumplings.Store
 type Store struct {
-	rand              *rand.Rand
-	orderID           int64
+	ids               IDGenerator
 	availableProducts []dumplings.Product
 }
 
-func NewStore() *Store {
-	return &Store{
-		rand: rand.New(rand.NewSource(time.Now().UnixNano())),
-	}
+func NewStore(ids IDGenerator) *Store {
+	return &Store{ids: ids}
 }
 
 func (s *Store) SetAvailablePacks(products ...dumplings.Product) {
@@ -30,7 +29,7 @@ func (s *Store) ListProducts(_ context.Context) ([]dumplings.Product, error) {
 	return s.availableProducts, nil
 }
 
-// CreateOrder fakes order creation by incrementing internal id
-func (s *Store) CreateOrder(_ context.Context, _ ...dumplings.OrderItem) (id int64, err error) {
-	return atomic.AddInt64(&s.orderID, 1), nil
+// CreateOrder fakes order creation, returning an opaque unguessable id.
+func (s *Store) CreateOrder(_ context.Context, _ ...dumplings.OrderItem) (id string, err error) {
+	return s.ids.Next(), nil
 }

@@ -9,6 +9,8 @@ services:
       - "8081"
     ports:
       - "${BACKEND_DEBUG_PORT:-18081}:8081"
+    secrets:
+      - order_id_secret
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/health"]
       interval: 5s
@@ -26,6 +28,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    secrets:
+      - metrics_htpasswd
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/lb-health"]
       interval: 10s
@@ -52,3 +56,9 @@ services:
       start_period: 5s
       retries: 3
     restart: "no"
+
+secrets:
+  metrics_htpasswd:
+    file: ${METRICS_HTPASSWD_FILE:-./secrets/metrics.htpasswd}
+  order_id_secret:
+    file: ${ORDER_ID_SECRET_FILE:-./secrets/order_id.secret}

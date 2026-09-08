@@ -36,14 +36,14 @@ func (m *MockStore) EXPECT() *MockStoreMockRecorder {
 }
 
 // CreateOrder mocks base method.
-func (m *MockStore) CreateOrder(ctx context.Context, items ...dumplings.OrderItem) (int64, error) {
+func (m *MockStore) CreateOrder(ctx context.Context, items ...dumplings.OrderItem) (string, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{ctx}
 	for _, a := range items {
 		varargs = append(varargs, a)
 	}
 	ret := m.ctrl.Call(m, "CreateOrder", varargs...)
-	ret0, _ := ret[0].(int64)
+	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

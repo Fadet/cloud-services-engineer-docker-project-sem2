@@ -15,6 +15,7 @@ import (
 	"gitlab.praktikum-services.ru/Stasyan/momo-store/cmd/api/app"
 	"gitlab.praktikum-services.ru/Stasyan/momo-store/cmd/api/dependencies"
 	"gitlab.praktikum-services.ru/Stasyan/momo-store/internal/logger"
+	"gitlab.praktikum-services.ru/Stasyan/momo-store/internal/orderid"
 )
 
 func main() {
@@ -32,7 +33,22 @@ func run() error {
 		return err
 	}
 
-	store, err := dependencies.NewFakeDumplingsStore()
+	secret, generated, err := orderid.LoadSecret()
+	if err != nil {
+		return fmt.Errorf("cannot load order id secret: %w", err)
+	}
+	if generated {
+		logger.Log.Warn("order id secret not provided, generated a temporary one; " +
+			"order ids stay unguessable and unique, but are no longer reproducible " +
+			"across restarts and shared between replicas")
+	}
+
+	idGen, err := orderid.New(secret)
+	if err != nil {
+		return fmt.Errorf("cannot create order id generator: %w", err)
+	}
+
+	store, err := dependencies.NewFakeDumplingsStore(idGen)
 	if err != nil {
 		return fmt.Errorf("cannot bootstrap dumplings store: %w", err)
 	}

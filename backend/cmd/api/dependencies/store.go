@@ -6,7 +6,7 @@ import (
 )
 
 // NewFakeDumplingsStore returns new fake store for app
-func NewFakeDumplingsStore() (dumplings.Store, error) {
+func NewFakeDumplingsStore(ids fake.IDGenerator) (dumplings.Store, error) {
 	packs := []dumplings.Product{
 		{
 			ID:          1,
@@ -108,7 +108,7 @@ func NewFakeDumplingsStore() (dumplings.Store, error) {
 		},
 	}
 
-	store := fake.NewStore()
+	store := fake.NewStore(ids)
 	store.SetAvailablePacks(packs...)
 
 	return store, nil

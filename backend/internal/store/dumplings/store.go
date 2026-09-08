@@ -11,5 +11,5 @@ type Store interface {
 	// ListProducts returns all available dumplings products
 	ListProducts(ctx context.Context) ([]Product, error)
 	// CreateOrder stores new order into store
-	CreateOrder(ctx context.Context, items ...OrderItem) (id int64, err error)
+	CreateOrder(ctx context.Context, items ...OrderItem) (id string, err error)
 }

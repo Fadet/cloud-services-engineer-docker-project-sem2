@@ -7,20 +7,42 @@ services:
     image: momo-store-backend:latest
     expose:
       - "8081"
+    user: "65532:65532"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
+    stop_grace_period: 15s
     deploy:
       replicas: 3
       resources:
         limits:
           cpus: "0.50"
           memory: 128M
+          pids: 100
+        reservations:
+          cpus: "0.10"
+          memory: 32M
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/health"]
       interval: 5s
       timeout: 3s
       start_period: 5s
       retries: 3
-    restart: unless-stopped
-    networks: [momo-net]
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [internal]
 
   lb:
     image: nginxinc/nginx-unprivileged:1.27-alpine
@@ -31,14 +53,42 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    user: "101"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+      - /var/cache/nginx:rw,noexec,nosuid,nodev,size=16m,mode=1777
+      - /etc/nginx/conf.d:rw,noexec,nosuid,nodev,size=1m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+          pids: 100
+        reservations:
+          cpus: "0.05"
+          memory: 16M
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/lb-health"]
       interval: 10s
       timeout: 3s
       start_period: 5s
       retries: 3
-    restart: unless-stopped
-    networks: [momo-net]
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [edge, internal]
 
   frontend:
     build:
@@ -51,15 +101,46 @@ services:
     depends_on:
       lb:
         condition: service_healthy
+    user: "101"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+      - /var/cache/nginx:rw,noexec,nosuid,nodev,size=16m,mode=1777
+      - /etc/nginx/conf.d:rw,noexec,nosuid,nodev,size=1m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+          pids: 100
+        reservations:
+          cpus: "0.05"
+          memory: 16M
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
       interval: 10s
       timeout: 3s
       start_period: 5s
       retries: 3
-    restart: unless-stopped
-    networks: [momo-net]
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [edge]
 
 networks:
-  momo-net:
+  edge:
     driver: bridge
+  internal:
+    driver: bridge
+    internal: true

@@ -1,4 +1,4 @@
-FROM golang:1.26.4-alpine3.23 AS builder
+FROM golang:1.26.6-alpine3.23 AS builder
 
 WORKDIR /src
 
@@ -14,6 +14,8 @@ RUN CGO_ENABLED=0 GOOS=linux \
     go build -trimpath -ldflags="-s -w" -o /out/api ./cmd/api
 
 FROM alpine:3.23
+
+RUN apk --no-cache upgrade
 
 WORKDIR /app
 

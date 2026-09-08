@@ -14,7 +14,11 @@ ENV VUE_APP_API_URL=${VUE_APP_API_URL}
 RUN npm run build
 
 # Образ уже работает под непривилегированным uid 101
-FROM nginxinc/nginx-unprivileged:1.27-alpine
+FROM nginxinc/nginx-unprivileged:1.29-alpine3.23
+
+USER root
+RUN apk --no-cache upgrade
+USER 101
 
 COPY --chown=101:0 default.conf.template /etc/nginx/templates/default.conf.template
 COPY --chown=101:0 --from=builder /app/dist /usr/share/nginx/html/momo-store

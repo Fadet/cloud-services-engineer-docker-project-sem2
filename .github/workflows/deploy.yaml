@@ -19,6 +19,40 @@ jobs:
           with:
             username: ${{ secrets.DOCKER_USER }}
             password: ${{ secrets.DOCKER_PASSWORD }}
+        # Скан ДО публикации: собираем образы локально (push: false, load: true)
+        # и проверяем их. Если Trivy найдёт HIGH/CRITICAL, job упадёт здесь и шаги
+        # Push ниже не выполнятся — уязвимый образ в реестр не уедет. Слои берутся
+        # из кеша того же buildx-билдера, поэтому пуш не пересобирает всё заново.
+        - name: Build backend image for scanning
+          uses: docker/build-push-action@v4
+          with:
+            context: ./backend/
+            push: false
+            load: true
+            tags: momo-store-backend:scan
+        - name: Build frontend image for scanning
+          uses: docker/build-push-action@v4
+          with:
+            context: ./frontend/
+            push: false
+            load: true
+            tags: momo-store-frontend:scan
+        - name: Scan backend image with Trivy
+          uses: aquasecurity/trivy-action@v0.36.0
+          with:
+            scan-type: image
+            image-ref: momo-store-backend:scan
+            scanners: vuln
+            severity: HIGH,CRITICAL
+            exit-code: '1'
+        - name: Scan frontend image with Trivy
+          uses: aquasecurity/trivy-action@v0.36.0
+          with:
+            scan-type: image
+            image-ref: momo-store-frontend:scan
+            scanners: vuln
+            severity: HIGH,CRITICAL
+            exit-code: '1'
         - name: Push Backend to DockerHub
           uses: docker/build-push-action@v4
           with:
@@ -40,5 +74,83 @@ jobs:
         uses: actions/checkout@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+
+      - name: Prepare runtime secrets
+        run: |
+          set -euo pipefail
+          mkdir -p secrets
+          openssl rand -hex 32 > secrets/order_id.secret
+          docker run --rm httpd:2.4-alpine \
+            htpasswd -nbB metrics "$(openssl rand -hex 16)" > secrets/metrics.htpasswd
+          chmod 0644 secrets/order_id.secret secrets/metrics.htpasswd
+
       - name: Build via Docker Compose
         uses: hoverkraft-tech/compose-action@v2.2.0
+        
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+
+          # up -d дожидается только healthy-зависимостей, сам фронт может быть ещё starting
+          for _ in $(seq 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost/healthz || true)
+            [ "$code" = "200" ] && break
+            sleep 2
+          done
+
+          check() {
+            code=$(curl -sL -o /dev/null -w '%{http_code}' "$1")
+            echo "  $3 -> $code (ожидалось $2)"
+            [ "$code" = "$2" ]
+          }
+
+          echo "== эндпоинты =="
+          check http://localhost/healthz        200 "фронт /healthz"
+          check http://localhost/momo-store/    200 "фронт SPA"
+          check http://localhost:8081/health    200 "бэкенд через балансировщик"
+          check http://localhost:8081/products/ 200 "каталог через балансировщик"
+          check http://localhost:8081/metrics   401 "метрики закрыты basic-auth"
+
+          echo "== идентификаторы заказов =="
+          for _ in $(seq 30); do
+            curl -s -X POST http://localhost:8081/orders \
+              | sed 's/.*"id":"\([^"]*\)".*/\1/'
+          done > ids.txt
+
+          total=$(wc -l < ids.txt | tr -d ' ')
+          uniq_total=$(sort -u ids.txt | wc -l | tr -d ' ')
+          # grep -c возвращает 1 при нуле совпадений и под set -e убил бы шаг
+          bad_format=$(grep -cvE '^[0-9a-f]{32}$' ids.txt || true)
+
+          echo "  заказов: $total, уникальных: $uniq_total, неверного формата: $bad_format"
+          [ "$total" -eq "$uniq_total" ]
+          [ "$bad_format" -eq 0 ]
+
+          echo "== реплики =="
+          replicas=$(docker compose ps -q backend | wc -l | tr -d ' ')
+          echo "  реплик бэкенда: $replicas (ожидалось 3)"
+          [ "$replicas" -eq 3 ]
+      - name: Scan local backend image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: momo-store-backend:latest
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+      - name: Scan local frontend image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: momo-store-frontend:latest
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+      - name: Scan repo for leaked secrets with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: '.'
+          scanners: secret
+          severity: HIGH,CRITICAL
+          exit-code: '1'

@@ -21,7 +21,7 @@ var orderIDFormat = regexp.MustCompile(`^[0-9a-f]{32}$`)
 func TestFakeAppIntegrational(t *testing.T) {
 	idGen, err := orderid.New([]byte("test-secret"))
 	require.NoError(t, err)
-	store, err := dependencies.NewFakeDumplingsStore(idGen)
+	store, err := dependencies.NewFakeDumplingsStore(idGen, nil)
 	assert.NoError(t, err)
 	app, err := NewInstance(store)
 	assert.NoError(t, err)

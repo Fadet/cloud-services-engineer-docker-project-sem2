@@ -7,6 +7,8 @@ services:
     image: momo-store-backend:latest
     expose:
       - "8081"
+    volumes:
+      - orders_data:/data
     user: "65532:65532"
     read_only: true
     tmpfs:
@@ -47,9 +49,9 @@ services:
     networks: [internal]
 
   lb:
-    image: nginxinc/nginx-unprivileged:1.27-alpine
-    volumes:
-      - ./nginx/lb.conf.template:/etc/nginx/templates/default.conf.template:ro
+    build:
+      context: ./nginx
+    image: momo-store-lb:latest
     ports:
       - "${BACKEND_PORT:-8081}:8081"
     depends_on:
@@ -148,6 +150,9 @@ networks:
   internal:
     driver: bridge
     internal: true
+
+volumes:
+  orders_data:
 
 secrets:
   metrics_htpasswd:

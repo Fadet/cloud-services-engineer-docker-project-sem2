@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -27,6 +28,25 @@ func main() {
 	}
 }
 
+func openOrderJournal() (io.Writer, func(), error) {
+	path, ok := os.LookupEnv("ORDERS_FILE")
+	if !ok {
+		path = "/data/orders.jsonl"
+	}
+	if path == "" {
+		logger.Log.Warn("order journal is disabled, created orders will not be persisted")
+		return nil, func() {}, nil
+	}
+
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o640)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot open order journal %s: %w", path, err)
+	}
+
+	logger.Log.Info("persisting orders", zap.String("path", path))
+	return f, func() { _ = f.Close() }, nil
+}
+
 func run() error {
 	lis, err := net.Listen("tcp", ":8081")
 	if err != nil {
@@ -48,7 +68,13 @@ func run() error {
 		return fmt.Errorf("cannot create order id generator: %w", err)
 	}
 
-	store, err := dependencies.NewFakeDumplingsStore(idGen)
+	journal, closeJournal, err := openOrderJournal()
+	if err != nil {
+		return err
+	}
+	defer closeJournal()
+
+	store, err := dependencies.NewFakeDumplingsStore(idGen, journal)
 	if err != nil {
 		return fmt.Errorf("cannot bootstrap dumplings store: %w", err)
 	}

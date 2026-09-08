@@ -19,10 +19,6 @@ jobs:
           with:
             username: ${{ secrets.DOCKER_USER }}
             password: ${{ secrets.DOCKER_PASSWORD }}
-        # Скан ДО публикации: собираем образы локально (push: false, load: true)
-        # и проверяем их. Если Trivy найдёт HIGH/CRITICAL, job упадёт здесь и шаги
-        # Push ниже не выполнятся — уязвимый образ в реестр не уедет. Слои берутся
-        # из кеша того же buildx-билдера, поэтому пуш не пересобирает всё заново.
         - name: Build backend image for scanning
           uses: docker/build-push-action@v4
           with:
@@ -143,6 +139,14 @@ jobs:
         with:
           scan-type: image
           image-ref: momo-store-frontend:latest
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+      - name: Scan local lb image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: momo-store-lb:latest
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: '1'

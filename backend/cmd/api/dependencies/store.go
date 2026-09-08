@@ -1,12 +1,14 @@
 package dependencies
 
 import (
+	"io"
+
 	"gitlab.praktikum-services.ru/Stasyan/momo-store/internal/store/dumplings"
 	"gitlab.praktikum-services.ru/Stasyan/momo-store/internal/store/dumplings/fake"
 )
 
 // NewFakeDumplingsStore returns new fake store for app
-func NewFakeDumplingsStore(ids fake.IDGenerator) (dumplings.Store, error) {
+func NewFakeDumplingsStore(ids fake.IDGenerator, journal io.Writer) (dumplings.Store, error) {
 	packs := []dumplings.Product{
 		{
 			ID:          1,
@@ -108,7 +110,7 @@ func NewFakeDumplingsStore(ids fake.IDGenerator) (dumplings.Store, error) {
 		},
 	}
 
-	store := fake.NewStore(ids)
+	store := fake.NewStore(ids, journal)
 	store.SetAvailablePacks(packs...)
 
 	return store, nil

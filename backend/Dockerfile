@@ -17,17 +17,13 @@ FROM alpine:3.23
 
 WORKDIR /app
 
-# Порт задаётся на сборке и пробрасывается в окружение — его читает и сервер, и HEALTHCHECK.
-ARG BACKEND_PORT=8081
-ENV BACKEND_PORT=${BACKEND_PORT}
-
 # Копируем бинарник и запускаем от непривилегированного пользователя с UID/GID 65532.
 COPY --from=builder --chown=65532:65532 /out/api /app/api
 USER 65532:65532
 
-EXPOSE ${BACKEND_PORT}
+EXPOSE 8081
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget -q -O /dev/null "http://127.0.0.1:${BACKEND_PORT}/health" || exit 1
+    CMD wget -q -O /dev/null "http://127.0.0.1:8081/health" || exit 1
 
 ENTRYPOINT ["/app/api"]
